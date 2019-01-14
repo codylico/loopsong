@@ -6,11 +6,36 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <float.h>
+
+int report_time_change(double real, double new_real){
+  if (real > new_real)
+    return fprintf(stderr,
+      "Removed %g unnecessary seconds of playback.\n",
+      real - new_real);
+  else
+    return fprintf(stderr,
+      "Added %g extra seconds of playback.\n",
+      new_real - real);
+}
+
+int enter_once_mode(ALLEGRO_AUDIO_STREAM* stream, double stream_length){
+  if (!al_set_audio_stream_loop_secs(stream, 0.0, stream_length)){
+    fprintf(stderr, "\nfailed to set loop points\n");
+    return 0;
+  }
+  if (!al_set_audio_stream_playmode(stream, ALLEGRO_PLAYMODE_ONCE)){
+    fprintf(stderr, "\nfailed to set play mode\n");
+    return 0;
+  } else fprintf(stderr, "\nplay mode: ONCE\n");
+  return 1;
+}
 
 double local_atof(char const* str){
   if (str == NULL) return -1;
   else return atof(str);
 }
+
 char* local_strdup(char const* str){
   if (str != NULL){
     size_t len = strlen(str);
@@ -57,6 +82,14 @@ int main(int argc, char**argv){
   double end = 5.0;
   char const* song_file;
 
+  /*
+   * short-play switch:
+   *   -1 short play possible; may finish early
+   *    0 medium play; fades out at end
+   *   +1 long play; takes extra time to finish properly
+   */
+  int shortplay_switch = 0;
+
   /* parse arguments */{
     int argi;
     int n = 0;
@@ -70,6 +103,12 @@ int main(int argc, char**argv){
           if (++argi < argc){
             fade_duration = parse_duration(argv[argi]);
           }
+        } else if (strcmp(argv[argi],"-s") == 0){
+          shortplay_switch = -1;
+        } else if (strcmp(argv[argi],"-m") == 0){
+          shortplay_switch = 0;
+        } else if (strcmp(argv[argi],"-l") == 0){
+          shortplay_switch = +1;
         } else {
           fprintf(stderr, "unrecognized option %s\n", argv[argi]);
           help_tf = 1;
@@ -91,7 +130,13 @@ int main(int argc, char**argv){
         "      minimum number of seconds to play file\n"
         "options:\n"
         "  -f (seconds)\n"
-        "      duration of fade out in seconds\n",
+        "      duration of fade out in seconds\n"
+        "  -s\n"
+        "      finish early if needed\n"
+        "  -m\n"
+        "      fade out on time\n"
+        "  -l\n"
+        "      take extra time to finish out the song\n",
         stderr);
       return EXIT_FAILURE;
     }
@@ -126,6 +171,7 @@ int main(int argc, char**argv){
     fprintf(stderr, "end:   %g\n", end);
     fprintf(stderr, "time:  %g\n", duration);
     fprintf(stderr, "fade:  %g\n", fade_duration);
+    fprintf(stderr, "short: %i\n", shortplay_switch);
     /* initialize audio */{
       if (!al_install_audio()){
         fprintf(stderr, "failed to install audio\n");
@@ -144,7 +190,8 @@ int main(int argc, char**argv){
     double stream_length;
     /* connect and play audio */do {
       double real_start, real_stop;
-      double loop_length = end-start;
+      double loop_length;
+      double loop_to_end;
       double right_now;
       int loop_tf = 0;
       voice =
@@ -166,11 +213,16 @@ int main(int argc, char**argv){
         fprintf(stderr, "failed to load audio stream\n");
         break;
       }
-      stream_length = al_get_audio_stream_length_secs(stream);
-      fprintf(stderr,"length: %g\n", stream_length);
-      if (start < 0.) start = 0.;
-      if (end < 0.) end = stream_length;
+      /* initialize key points */{
+        stream_length = al_get_audio_stream_length_secs(stream);
+        fprintf(stderr,"length: %g\n", stream_length);
+        if (start < 0.) start = 0.;
+        if (end < 0.) end = stream_length;
+        loop_to_end = stream_length - start;
+        loop_length = end-start;
+      }
       if (end >= duration){
+        /* shortcut */
         if (!al_set_audio_stream_playmode(stream, ALLEGRO_PLAYMODE_ONCE)){
           fprintf(stderr, "failed to set play mode\n");
         } else fprintf(stderr, "play mode: ONCE\n");
@@ -194,23 +246,58 @@ int main(int argc, char**argv){
       right_now = al_get_time();
       while (right_now < real_stop){
         double const time_left = real_stop - right_now;
-        fprintf(stderr, "Time left: %.2f\r", time_left);
+        fprintf(stderr, "Time left: %8.2f\r", time_left);
         fflush(stderr);
-        if (loop_tf){
-          if (time_left < loop_length){
-            if (!al_set_audio_stream_loop_secs(stream, 0.0, stream_length)){
-              fprintf(stderr, "\nfailed to set loop points\n");
-              break;
+        switch (shortplay_switch){
+        case -1:
+          /* play short but whole */if (loop_tf){
+            if (time_left < loop_to_end){
+              double const stream_point =
+                al_get_audio_stream_position_secs(stream);
+              double const new_real_stop
+                  = (stream_length - stream_point) + right_now
+                  + FLT_EPSILON;
+              enter_once_mode(stream, stream_length);
+              report_time_change(real_stop, new_real_stop);
+              /* remove unnecessary time */
+              real_stop = new_real_stop;
+              loop_tf = 0;
             }
-            if (!al_set_audio_stream_playmode(stream, ALLEGRO_PLAYMODE_ONCE)){
-              fprintf(stderr, "\nfailed to set play mode\n");
-              break;
-            } else fprintf(stderr, "\nplay mode: ONCE\n");
-            loop_tf = 0;
-          }
+          }break;
+        case 0:
+          /* just let the song play out */
+          break;
+        case +1:
+          /* play long and whole */if (loop_tf == 1){
+            if (time_left < loop_to_end){
+              double const stream_point =
+                al_get_audio_stream_position_secs(stream);
+              double const new_real_stop
+                  = loop_to_end + right_now
+                  + (end - stream_point) + FLT_EPSILON;
+              report_time_change(real_stop, new_real_stop);
+              /* add extra time to finish as needed */
+              real_stop = new_real_stop;
+              loop_tf = 2;
+            }
+          } else if (loop_tf == 2){
+            if (time_left < loop_to_end){
+              enter_once_mode(stream, stream_length);
+              loop_tf = 0;
+            }
+          }break;
+        default:
+          if (loop_tf){
+            if (time_left < loop_length){
+              enter_once_mode(stream, stream_length);
+              loop_tf = 0;
+            }
+          }break;
         }
         if (time_left > fade_duration){
-          al_rest(1.0);
+          if (!al_get_audio_stream_playing(stream))
+            break;
+          else al_rest(1.0);
         } else if (time_left > 0.1){
           al_set_mixer_gain(mixer, time_left/fade_duration);
           al_rest(0.1);
