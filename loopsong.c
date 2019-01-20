@@ -8,6 +8,14 @@
 #include <stdio.h>
 #include <float.h>
 
+static int report_time_change(double real, double new_real);
+static int enter_once_mode
+  (ALLEGRO_AUDIO_STREAM* stream, double stream_length);
+static double local_atof(char const* str);
+static double local_atof_seconds(char const* str);
+static char* local_strdup(char const* str);
+static double parse_duration(char const* str);
+
 int report_time_change(double real, double new_real){
   if (real > new_real)
     return fprintf(stderr,
@@ -34,6 +42,11 @@ int enter_once_mode(ALLEGRO_AUDIO_STREAM* stream, double stream_length){
 double local_atof(char const* str){
   if (str == NULL) return -1;
   else return atof(str);
+}
+
+double local_atof_seconds(char const* str){
+  if (str == NULL) return -1;
+  else return parse_duration(str);
 }
 
 char* local_strdup(char const* str){
@@ -148,10 +161,10 @@ int main(int argc, char**argv){
       song_file = local_strdup(
           al_get_config_value(cfg, NULL, "song")
         );
-      start = local_atof(
+      start = local_atof_seconds(
           al_get_config_value(cfg, NULL, "start")
         );
-      end = local_atof(
+      end = local_atof_seconds(
           al_get_config_value(cfg, NULL, "end")
         );
       al_destroy_config(cfg);
