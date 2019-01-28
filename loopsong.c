@@ -64,6 +64,14 @@ char* local_strdup(char const* str){
 double parse_duration(char const* str){
   char const *p, *q, *end;
   double out = 0.0;
+  int sign = 0;
+  if (*str == '-') {
+    sign = -1;
+    str += 1;
+  } else if (*str == '+') {
+    sign = +1;
+    str += 1;
+  }
   p = str;
   for (q = str; *q != 0; ++q){
     if (*q == ':'){
@@ -83,6 +91,7 @@ double parse_duration(char const* str){
     double fragment = atof(p);
     out += fragment;
   }
+  if (sign) out *= sign;
   return out;
 }
 
