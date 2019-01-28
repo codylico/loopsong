@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2019 by Cody Licorish
+ * This source file is made available under the Unlicense.
+ * See <http://unlicense.org> for more information about the Unlicense.
+ */
 
 #include <allegro5/allegro.h>
 #include <allegro5/allegro_audio.h>
