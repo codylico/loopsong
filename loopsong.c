@@ -107,6 +107,7 @@ int main(int argc, char**argv){
   char const* ini_file = NULL;
   double start = 0.0;
   double end = 5.0;
+  double seek_point = 0.0;
   char const* song_file;
 
   /*
@@ -129,6 +130,10 @@ int main(int argc, char**argv){
         } else if (strcmp(argv[argi],"-f") == 0){
           if (++argi < argc){
             fade_duration = parse_duration(argv[argi]);
+          }
+        } else if (strcmp(argv[argi],"-k") == 0){
+          if (++argi < argc){
+            seek_point = parse_duration(argv[argi]);
           }
         } else if (strcmp(argv[argi],"-s") == 0){
           shortplay_switch = -1;
@@ -158,6 +163,8 @@ int main(int argc, char**argv){
         "options:\n"
         "  -f (seconds)\n"
         "      duration of fade out in seconds\n"
+        "  -k (seconds)\n"
+        "      position from which to start playing\n"
         "  -s\n"
         "      finish early if needed\n"
         "  -m\n"
@@ -199,6 +206,7 @@ int main(int argc, char**argv){
     fprintf(stderr, "time:  %g\n", duration);
     fprintf(stderr, "fade:  %g\n", fade_duration);
     fprintf(stderr, "short: %i\n", shortplay_switch);
+    fprintf(stderr, "seek:  %g\n", seek_point);
     /* initialize audio */{
       if (!al_install_audio()){
         fprintf(stderr, "failed to install audio\n");
@@ -245,6 +253,10 @@ int main(int argc, char**argv){
         fprintf(stderr,"length: %g\n", stream_length);
         if (start < 0.) start = 0.;
         if (end < 0.) end = stream_length;
+        if (seek_point <= 0.)
+          seek_point = 0.;
+        else if (seek_point > stream_length)
+          seek_point = stream_length;
         loop_to_end = stream_length - start;
         loop_length = end-start;
       }
@@ -264,6 +276,16 @@ int main(int argc, char**argv){
           break;
         } else fprintf(stderr, "play mode: LOOP\n");
         loop_tf = 1;
+      }
+      if (seek_point > 0.
+      &&  seek_point < stream_length)
+      {
+        if (al_seek_audio_stream_secs(stream, seek_point)){
+          fprintf(stderr, "sought to position %g\n",
+            seek_point);
+        } else fprintf(stderr, "failed to seek to position %g\n");
+      } else {
+        fprintf(stderr, "ignoring seek positions\n");
       }
       al_attach_mixer_to_voice(mixer, voice);
       /* start the clock here */
