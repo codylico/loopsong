@@ -295,7 +295,7 @@ int main(int argc, char**argv){
       right_now = al_get_time();
       while (right_now < real_stop){
         double const time_left = real_stop - right_now;
-        fprintf(stderr, "Time left: %8.2f\r", time_left);
+        fprintf(stderr, "Time left: %8.2f \r", time_left);
         fflush(stderr);
         switch (shortplay_switch){
         case -1:
