@@ -13,10 +13,21 @@ Input files use the following format:
 song=/path/to/song.ogg
 start=start_seconds
 end=end_seconds
+
+[alternate]
+start=other_start_seconds
+end=other_end_seconds
 ```
 The `song` field corresponds to the file path to the audio file to loop.
 The `start` and `end` fields map to the beginning and end loop points
 for the audio, specified in seconds.
+
+Alternate loop parameters for the same song can be specified using
+separate sections (i.e. `[like this]`) for each collection of parameters.
+Any parameters unspecified in the section are taken from the global
+parameters at top. The example above provides a single `[alternate]`
+section holding different `start` and `end` parameters, implicitly using
+the same `song`.
 
 ## Build
 
@@ -67,6 +78,9 @@ Optional arguments are:
 + `-a`: If the `loopsong` program is stopped or put to sleep,
   setting this option will allow `loopsong` to reclaim most of
   the time it missed.
++ `-d (section_name)`: Pull parameters from the `[section_name]` section
+  in addition to the global parameters. The section-specific parameters
+  have the final say.
 
 Other arguments configure how `loopsong` adjusts the playback time.
 + `-m`: The default mode, _middle_, cuts the song off exactly after

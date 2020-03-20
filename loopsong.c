@@ -136,6 +136,7 @@ int main(int argc, char**argv){
   double end = 5.0;
   double seek_point = 0.0;
   char const* song_file;
+  char const* loop_def_name = NULL;
 
   /*
    * short-play switch:
@@ -170,6 +171,10 @@ int main(int argc, char**argv){
           shortplay_switch = 0;
         } else if (strcmp(argv[argi],"-l") == 0){
           shortplay_switch = +1;
+        } else if (strcmp(argv[argi],"-d") == 0){
+          if (++argi < argc){
+            loop_def_name = argv[argi];
+          }
         } else {
           fprintf(stderr, "unrecognized option %s\n", argv[argi]);
           help_tf = 1;
@@ -201,7 +206,10 @@ int main(int argc, char**argv){
         "  -l\n"
         "      take extra time to finish out the song\n"
         "  -a\n"
-        "      adjust for when the player sleeps too long\n",
+        "      adjust for when the player sleeps too long\n"
+        "  -d (name)\n"
+        "      pull additional loop definition parameters\n"
+        "      from section [name]\n",
         stderr);
       return EXIT_FAILURE;
     }
@@ -219,6 +227,24 @@ int main(int argc, char**argv){
       end = local_atof_seconds(
           al_get_config_value(cfg, NULL, "end")
         );
+      if (loop_def_name != NULL && loop_def_name[0] != '\0') {
+        char const* const subsong_file =
+           al_get_config_value(cfg, loop_def_name, "song");
+        char const* const substart =
+           al_get_config_value(cfg, loop_def_name, "start");
+        char const* const subend =
+           al_get_config_value(cfg, loop_def_name, "end");
+        if (subsong_file != NULL) {
+          free((char*)song_file);
+          song_file = local_strdup(subsong_file);
+        }
+        if (substart != NULL) {
+          start = local_atof_seconds(substart);
+        }
+        if (subend != NULL) {
+          end = local_atof_seconds(subend);
+        }
+      }
       al_destroy_config(cfg);
     } else {
       result = EXIT_FAILURE;
