@@ -283,7 +283,7 @@ int main(int argc, char**argv){
         if (al_seek_audio_stream_secs(stream, seek_point)){
           fprintf(stderr, "sought to position %g\n",
             seek_point);
-        } else fprintf(stderr, "failed to seek to position %g\n");
+        } else fprintf(stderr, "failed to seek to position %g\n", seek_point);
       } else {
         fprintf(stderr, "ignoring seek positions\n");
       }
