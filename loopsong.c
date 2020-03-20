@@ -21,6 +21,15 @@ static double local_atof_seconds(char const* str);
 static char* local_strdup(char const* str);
 static double parse_duration(char const* str);
 
+/* for basic stop/computer sleep detection */
+static int adjusted_al_enable = 0;
+/* for basic stop/computer sleep detection */
+static double adjusted_al_time = 0.0;
+/* for basic stop/computer sleep detection */
+static double adjusted_al_get_time(void);
+/* for basic stop/computer sleep detection */
+static void adjusted_al_rest(double seconds);
+
 int report_time_change(double real, double new_real){
   if (real > new_real)
     return fprintf(stderr,
@@ -100,6 +109,24 @@ double parse_duration(char const* str){
   return out;
 }
 
+double adjusted_al_get_time(void) {
+  if (adjusted_al_enable)
+    return al_get_time()-adjusted_al_time;
+  else return al_get_time();
+}
+void adjusted_al_rest(double seconds) {
+  if (adjusted_al_enable) {
+    double diff_time;
+    double const start_time = al_get_time();
+    al_rest(seconds);
+    diff_time = al_get_time()-start_time;
+    if (diff_time > seconds*2.0) {
+      adjusted_al_time += (diff_time - seconds*2.0);
+    }
+  } else al_rest(seconds);
+  return;
+}
+
 int main(int argc, char**argv){
   int result = EXIT_SUCCESS;
   double duration = 5.0;
@@ -137,6 +164,8 @@ int main(int argc, char**argv){
           }
         } else if (strcmp(argv[argi],"-s") == 0){
           shortplay_switch = -1;
+        } else if (strcmp(argv[argi],"-a") == 0){
+          adjusted_al_enable = 1;
         } else if (strcmp(argv[argi],"-m") == 0){
           shortplay_switch = 0;
         } else if (strcmp(argv[argi],"-l") == 0){
@@ -170,7 +199,9 @@ int main(int argc, char**argv){
         "  -m\n"
         "      fade out on time\n"
         "  -l\n"
-        "      take extra time to finish out the song\n",
+        "      take extra time to finish out the song\n"
+        "  -a\n"
+        "      adjust for when the player sleeps too long\n",
         stderr);
       return EXIT_FAILURE;
     }
@@ -289,10 +320,10 @@ int main(int argc, char**argv){
       }
       al_attach_mixer_to_voice(mixer, voice);
       /* start the clock here */
-      real_start = al_get_time();
+      real_start = adjusted_al_get_time();
       al_attach_audio_stream_to_mixer(stream, mixer);
       real_stop = real_start+duration;
-      right_now = al_get_time();
+      right_now = adjusted_al_get_time();
       while (right_now < real_stop){
         double const time_left = real_stop - right_now;
         fprintf(stderr, "Time left: %8.2f \r", time_left);
@@ -346,14 +377,14 @@ int main(int argc, char**argv){
         if (time_left > fade_duration){
           if (!al_get_audio_stream_playing(stream))
             break;
-          else al_rest(1.0);
+          else adjusted_al_rest(1.0);
         } else if (time_left > 0.1){
           al_set_mixer_gain(mixer, time_left/fade_duration);
-          al_rest(0.1);
+          adjusted_al_rest(0.1);
         } else {
-          al_rest(time_left);
+          adjusted_al_rest(time_left);
         }
-        right_now = al_get_time();
+        right_now = adjusted_al_get_time();
       }
       ok = 1;
     } while (0);

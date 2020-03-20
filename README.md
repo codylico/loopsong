@@ -64,6 +64,9 @@ Optional arguments are:
   towards the end of playback. Set to zero for no fade out.
 + `-k (seconds)`: Playback can start from the seek position
   given in seconds.
++ `-a`: If the `loopsong` program is stopped or put to sleep,
+  setting this option will allow `loopsong` to reclaim most of
+  the time it missed.
 
 Other arguments configure how `loopsong` adjusts the playback time.
 + `-m`: The default mode, _middle_, cuts the song off exactly after
